@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classroom Car Racer</title>
+    <style>
+        :root {
+            --road-color: #444;
+            --grass-color: #7cfc00;
+            --car-color: #ff4757;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #87CEEB; /* Sky blue */
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background-color: var(--grass-color);
+            border: 10px solid #2f3542;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        /* The Road */
+        #road {
+            position: absolute;
+            width: 200px;
+            height: 100%;
+            background-color: var(--road-color);
+            left: 100px;
+            border-left: 5px dashed white;
+            border-right: 5px dashed white;
+        }
+
+        /* Moving stripes for speed effect */
+        .stripe {
+            position: absolute;
+            width: 10px;
+            height: 50px;
+            background: white;
+            left: 95px;
+            animation: moveRoad 2s linear infinite;
+        }
+
+        @keyframes moveRoad {
+            0% { top: -60px; }
+            100% { top: 600px; }
+        }
+
+        /* Player Car */
+        #player {
+            position: absolute;
+            width: 50px;
+            height: 80px;
+            background-color: var(--car-color);
+            bottom: 20px;
+            left: 175px; /* Middle start */
+            border-radius: 10px;
+            transition: left 0.2s ease-out;
+            z-index: 10;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        #player::before { /* Windshield */
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 20px;
+            background: #aaddff;
+            top: 10px;
+            left: 5px;
+            border-radius: 5px;
+        }
+
+        /* Objects to catch */
+        .object {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            font-size: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+        }
+
+        /* UI Elements */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            pointer-events: none;
+            text-align: center;
+        }
+
+        #prompt-box {
+            background: white;
+            padding: 10px;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            font-size: 24px;
+            font-weight: bold;
+            color: #2f3542;
+        }
+
+        #score-board {
+            position: absolute;
+            top: 70px;
+            right: 10px;
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            text-align: center;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 24px;
+            font-family: 'Comic Sans MS';
+            background: #2ed573;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+
+        button:hover { transform: scale(1.1); }
+
+        .hidden { display: none !important; }
+
+        /* Controls for Touch/Mouse */
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: auto;
+        }
+
+        .btn-ctrl {
+            background: rgba(255,255,255,0.3);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            font-size: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="road">
+            <div class="stripe" style="top: 0;"></div>
+            <div class="stripe" style="top: 150px;"></div>
+            <div class="stripe" style="top: 300px;"></div>
+            <div class="stripe" style="top: 450px;"></div>
+        </div>
+
+        <div id="player"></div>
+
+        <div id="ui-layer">
+            <div id="prompt-box">Press Start!</div>
+            <div id="score-board">Score: 0</div>
+        </div>
+
+        <div id="controls">
+            <div class="btn-ctrl" onmousedown="moveLeft()" ontouchstart="moveLeft()">⬅️</div>
+            <div class="btn-ctrl" onmousedown="moveRight()" ontouchstart="moveRight()">➡️</div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>Classroom Car Racer</h1>
+            <p>Listen and drive to the correct object!</p>
+            <button onclick="startGame()">START GAME</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1>Time's Up!</h1>
+            <p id="final-score">Your Score: 0</p>
+            <button onclick="startGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Configuration
+        const objects = [
+            { name: 'Book', emoji: '📚' },
+            { name: 'Pencil', emoji: '✏️' },
+            { name: 'Chair', emoji: '🪑' },
+            { name: 'Eraser', emoji: '🧼' },
+            { name: 'Ruler', emoji: '📏' },
+            { name: 'Backpack', emoji: '🎒' }
+        ];
+
+        let score = 0;
+        let gameActive = false;
+        let currentTarget = null;
+        let speed = 4;
+        let gameTimer;
+        let objectSpawnTimer;
+
+        // Elements
+        const player = document.getElementById('player');
+        const promptBox = document.getElementById('prompt-box');
+        const scoreBoard = document.getElementById('score-board');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const gameContainer = document.getElementById('game-container');
+
+        // Logic: Movement
+        let playerPos = 175; // Center lane X
+        const lanes = [115, 175, 235]; // Left, Middle, Right lane X positions
+
+        function moveLeft() {
+            let currentIndex = lanes.indexOf(playerPos);
+            if (currentIndex > 0) playerPos = lanes[currentIndex - 1];
+            player.style.left = playerPos + 'px';
+        }
+
+        function moveRight() {
+            let currentIndex = lanes.indexOf(playerPos);
+            if (currentIndex < lanes.length - 1) playerPos = lanes[currentIndex + 1];
+            player.style.left = playerPos + 'px';
+        }
+
+        // Listen for keyboard
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') moveLeft();
+            if (e.key === 'ArrowRight') moveRight();
+        });
+
+        // Speech Synthesis
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function startGame() {
+            score = 0;
+            speed = 4;
+            gameActive = true;
+            scoreBoard.innerText = `Score: ${score}`;
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            
+            setNewTarget();
+            gameLoop();
+            
+            // Spawn an object every 2.5 seconds
+            objectSpawnTimer = setInterval(spawnObject, 2500);
+
+            // End game after 60 seconds
+            setTimeout(endGame, 60000);
+        }
+
+        function setNewTarget() {
+            const randomObj = objects[Math.floor(Math.random() * objects.length)];
+            currentTarget = randomObj;
+            promptBox.innerText = `Find the ${currentTarget.name}!`;
+            speak(`Find the ${currentTarget.name}`);
+        }
+
+        function spawnObject() {
+            if (!gameActive) return;
+
+            const objData = objects[Math.floor(Math.random() * objects.length)];
+            const objEl = document.createElement('div');
+            objEl.className = 'object';
+            objEl.innerText = objData.emoji;
+            objEl.dataset.name = objData.name;
+            
+            // Pick a random lane
+            const laneX = lanes[Math.floor(Math.random() * lanes.length)];
+            objEl.style.left = (laneX - 5) + 'px'; // Center emoji in lane
+            objEl.style.top = '-60px';
+            
+            gameContainer.appendChild(objEl);
+
+            // Move the object down
+            let topPos = -60;
+            const moveInterval = setInterval(() => {
+                if (!gameActive) {
+                    clearInterval(moveInterval);
+                    objEl.remove();
+                    return;
+                }
+
+                topPos += speed;
+                objEl.style.top = topPos + 'px';
+
+                // Collision Detection
+                const playerRect = player.getBoundingClientRect();
+                const objRect = objEl.getBoundingClientRect();
+
+                if (
+                    playerRect.left < objRect.right &&
+                    playerRect.right > objRect.left &&
+                    playerRect.top < objRect.bottom &&
+                    playerRect.bottom > objRect.top
+                ) {
+                    checkMatch(objEl.dataset.name);
+                    objEl.remove();
+                    clearInterval(moveInterval);
+                }
+
+                // Remove if off screen
+                if (topPos > 600) {
+                    objEl.remove();
+                    clearInterval(moveInterval);
+                }
+            }, 20);
+        }
+
+        function checkMatch(hitName) {
+            if (hitName === currentTarget.name) {
+                score++;
+                speed += 0.2; // Increase difficulty
+                scoreBoard.innerText = `Score: ${score}`;
+                scoreBoard.style.color = "green";
+                setTimeout(() => scoreBoard.style.color = "black", 500);
+                setNewTarget();
+            } else {
+                if(score > 0) score--;
+                scoreBoard.innerText = `Score: ${score}`;
+                scoreBoard.style.color = "red";
+                setTimeout(() => scoreBoard.style.color = "black", 500);
+            }
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(objectSpawnTimer);
+            document.getElementById('final-score').innerText = `Your Score: ${score}`;
+            gameOverScreen.classList.remove('hidden');
+            speak(`Game over! You found ${score} items.`);
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
